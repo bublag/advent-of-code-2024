@@ -1,6 +1,7 @@
 package org.adventofcode.day05;
 
 import lombok.experimental.UtilityClass;
+import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
@@ -56,13 +57,13 @@ public class Main {
 		considering the page ordering rules).
 		If an update is valid, get the number in the middle and sum all those up.
 		 */
-		long validUpdatesMiddleNumberSum = 0;
+		long validUpdatesMiddleNumbersSum = 0;
+		final List<List<Integer>> incorrectlyOrderedUpdates = new ArrayList<>();
 		for (final List<Integer> update : updates) {
-			// not validating the first number
 			boolean isUpdateValid = true;
-			for (int i = 1; i < update.size(); i++) {
+			for (int i = 1; i < update.size(); i++) { // no need to validate the first number
 				final Integer currentNumberToValidate = update.get(i);
-				final Set<Integer> rulesForCurrentNumber = pageOrderingRules.get(currentNumberToValidate);
+				final Set<Integer> rulesForCurrentNumber = SetUtils.emptyIfNull(pageOrderingRules.get(currentNumberToValidate));
 				// go back in the list of numbers and check if there is any number before this which cant be based on the rules
 				boolean isNumberValid = true;
 				for (int j = i - 1; j >= 0 ; j--) {
@@ -78,10 +79,34 @@ public class Main {
 				}
 			}
 			if (isUpdateValid) {
-				validUpdatesMiddleNumberSum += getMiddleNumber(update);
+				validUpdatesMiddleNumbersSum += getMiddleNumber(update);
+			} else {
+				incorrectlyOrderedUpdates.add(new ArrayList<>(update));
 			}
 		}
-		System.out.println("validUpdatesMiddleNumberSum = " + validUpdatesMiddleNumberSum);
+		System.out.println("validUpdatesMiddleNumbersSum = " + validUpdatesMiddleNumbersSum);
+
+		// part 2: correctly order the incorrect rules with the page ordering rules
+		long correctedUpdatesMiddleNumbersSum = 0;
+		for (final List<Integer> incorrectlyOrderedUpdate : incorrectlyOrderedUpdates) {
+			for (int i = 1; i < incorrectlyOrderedUpdate.size(); i++) { // cant move the first number more back
+				final Integer currentNumberToCheckAndPossiblyMoveBack = incorrectlyOrderedUpdate.get(i);
+				int currentPositionOfCurrentNumberToCheckAndPossiblyMoveBack = i;
+				final Set<Integer> rulesForCurrentNumber = SetUtils.emptyIfNull(pageOrderingRules.get(currentNumberToCheckAndPossiblyMoveBack));
+				// go back in the list of numbers and swap positions if needed based on the page ordering rules
+				for (int j = i - 1; j >= 0 ; j--) {
+					final Integer previousNumber = incorrectlyOrderedUpdate.get(j);
+					if (rulesForCurrentNumber.contains(previousNumber)) { // swap positions in the list
+						incorrectlyOrderedUpdate.set(currentPositionOfCurrentNumberToCheckAndPossiblyMoveBack, previousNumber);
+						incorrectlyOrderedUpdate.set(j, currentNumberToCheckAndPossiblyMoveBack);
+						currentPositionOfCurrentNumberToCheckAndPossiblyMoveBack = j;
+					}
+				}
+			}
+			// after the above iteration, 'incorrectlyOrderedUpdate' is now correctly ordered
+			correctedUpdatesMiddleNumbersSum += getMiddleNumber(incorrectlyOrderedUpdate);
+		}
+		System.out.println("correctedUpdatesMiddleNumbersSum = " + correctedUpdatesMiddleNumbersSum);
 	}
 
 	private static int getMiddleNumber(final List<Integer> update) {
