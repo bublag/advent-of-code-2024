@@ -79,7 +79,7 @@ public class Main {
 	}
 
 	/**
-	 * <--
+	 * -->
 	 */
 	private static boolean checkXmasWordToStraightRight(
 		final char[][] charTable,
@@ -97,7 +97,7 @@ public class Main {
 	}
 
 	/**
-	 * -->
+	 * <--
 	 */
 	private static boolean checkXmasWordToStraightLeft(
 		final char[][] charTable,
