@@ -143,14 +143,6 @@ public class Main {
 		System.out.println("guardGotStuckInLoopCounter = " + guardGotStuckInLoopCounter);
 	}
 
-	private static char[][] cloneMap(final char[][] originalMap) {
-		final char[][] clonedMap = new char[originalMap.length][];
-		for (int i = 0; i < originalMap.length; i++) {
-			clonedMap[i] = Arrays.copyOf(originalMap[i], originalMap[i].length);
-		}
-		return clonedMap;
-	}
-
 	private static void printMap(final char[][] mapCharTable) {
 		for (final char[] row : mapCharTable) {
 			for (final char c : row) {
@@ -159,6 +151,14 @@ public class Main {
 			System.out.println();
 		}
 		System.out.println();
+	}
+
+	private static char[][] cloneMap(final char[][] originalMap) {
+		final char[][] clonedMap = new char[originalMap.length][];
+		for (int i = 0; i < originalMap.length; i++) {
+			clonedMap[i] = Arrays.copyOf(originalMap[i], originalMap[i].length);
+		}
+		return clonedMap;
 	}
 
 	private static boolean isGuardFacingTheBorderOfTheMap(
