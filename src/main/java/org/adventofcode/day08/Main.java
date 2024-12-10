@@ -72,7 +72,7 @@ public class Main {
 		System.out.println("uniqueAntiNodeLocations size = " + uniqueAntiNodeLocations.size());
 
 		/*
-		 part2: updating the model with "resonant harmonics effect": the antinodes are repeating on the line of 2
+		 part 2: updating the model with "resonant harmonics effect": the antinodes are repeating on the line of 2
 		 antennas, and we track them until the line goes off the map
 		 + rule: the antennas are also considered antinodes if the antenna is not alone in its frequency
 		 */
