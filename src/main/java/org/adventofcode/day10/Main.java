@@ -47,17 +47,46 @@ public class Main {
 		System.out.println("map:");
 		printMap(map);
 
-		// count the scores of every trailhead and add those together
+		// count the scores (number of 9-height locations reachable from the trailhead) of every trailhead and add those together
 		for (final TrailHead trailHead : trailHeads) {
-			trailHead.setScore(countScoreDepthFirstSearch(map, mapMaxX, mapMaxY, trailHead.getPoint(), new LinkedHashSet<>(), 0));
+			trailHead.setScoreOrRating(countScoreDepthFirstSearch(map, mapMaxX, mapMaxY, trailHead.getPoint(), new LinkedHashSet<>(), 0));
 		}
 		System.out.println("trailHeads = " + trailHeads);
 		final long sumOfAllTrailHeadScores = trailHeads.stream()
-			.map(TrailHead::getScore)
+			.map(TrailHead::getScoreOrRating)
 			.mapToLong(value -> value)
 			.sum();
 		System.out.println("part1 solution runtime in milliseconds = " + (System.currentTimeMillis() - start));
 		System.out.println("sumOfAllTrailHeadScores = " + sumOfAllTrailHeadScores);
+		System.out.println();
+
+		/*
+		part 2: Count the ratings (number of distinct hiking trails to every 9-height locations from the trailhead) of
+		every trailhead and add those together.
+		The only difference in the graph search is we don't keep track of the already visited locations, so it finds
+		every possible way from the trailhead to every possible 9-height location (and increases the counter every time).
+		 */
+		final long start2 = System.currentTimeMillis();
+		for (final TrailHead trailHead : trailHeads) {
+			trailHead.setScoreOrRating(countRatingDepthFirstSearch(map, mapMaxX, mapMaxY, trailHead.getPoint(), 0));
+		}
+		System.out.println("trailHeads = " + trailHeads);
+		final long sumOfAllTrailHeadRatings = trailHeads.stream()
+			.map(TrailHead::getScoreOrRating)
+			.mapToLong(value -> value)
+			.sum();
+		System.out.println("part2 solution runtime in milliseconds = " + (System.currentTimeMillis() - start2));
+		System.out.println("sumOfAllTrailHeadRatings = " + sumOfAllTrailHeadRatings);
+	}
+
+	private static void printMap(final int[][] map) {
+		for (final int[] y : map) {
+			for (final int x : y) {
+				System.out.print(x);
+			}
+			System.out.println();
+		}
+		System.out.println();
 	}
 
 	private static int countScoreDepthFirstSearch(
@@ -105,14 +134,44 @@ public class Main {
 		return newCurrentScore;
 	}
 
-	private static void printMap(final int[][] map) {
-		for (final int[] y : map) {
-			for (final int x : y) {
-				System.out.print(x);
-			}
-			System.out.println();
+	private static int countRatingDepthFirstSearch(
+		final int[][] map,
+		final int mapMaxX,
+		final int mapMaxY,
+		final Point pointFrom,
+		final int currentRating
+	) {
+		final int pointFromHeight = map[pointFrom.y()][pointFrom.x()];
+		if (pointFromHeight == 9) { // found a 9-height location -> increase the score
+			return currentRating + 1;
 		}
-		System.out.println();
+		int newCurrentScore = currentRating;
+		// go "deeper" in the graph recursively in all 4 directions, if the neighbor location is exactly 1 height greater (and inside map bounds)
+		if (pointFrom.y() > 0) { // 1 up is still within bounds
+			final Point pointToOneUp = new Point(pointFrom.x(), pointFrom.y() - 1);
+			if (map[pointToOneUp.y()][pointToOneUp.x()] == pointFromHeight + 1) {
+				newCurrentScore = countRatingDepthFirstSearch(map, mapMaxX, mapMaxY, pointToOneUp, newCurrentScore);
+			}
+		}
+		if (pointFrom.x() < mapMaxX) { // 1 right is still within bounds
+			final Point pointToOneRight = new Point(pointFrom.x() + 1, pointFrom.y());
+			if (map[pointToOneRight.y()][pointToOneRight.x()] == pointFromHeight + 1) {
+				newCurrentScore = countRatingDepthFirstSearch(map, mapMaxX, mapMaxY, pointToOneRight, newCurrentScore);
+			}
+		}
+		if (pointFrom.y() < mapMaxY) { // 1 down is still within bounds
+			final Point pointToOneDown = new Point(pointFrom.x(), pointFrom.y() + 1);
+			if (map[pointToOneDown.y()][pointToOneDown.x()] == pointFromHeight + 1) {
+				newCurrentScore = countRatingDepthFirstSearch(map, mapMaxX, mapMaxY, pointToOneDown, newCurrentScore);
+			}
+		}
+		if (pointFrom.x() > 0) { // 1 left is still within bounds
+			final Point pointToOneLeft = new Point(pointFrom.x() - 1, pointFrom.y());
+			if (map[pointToOneLeft.y()][pointToOneLeft.x()] == pointFromHeight + 1) {
+				newCurrentScore = countRatingDepthFirstSearch(map, mapMaxX, mapMaxY, pointToOneLeft, newCurrentScore);
+			}
+		}
+		return newCurrentScore;
 	}
 
 	private record Point(int x, int y) {}
@@ -122,7 +181,7 @@ public class Main {
 	private static final class TrailHead {
 		private final Point point;
 		@Setter
-		private int score = 0;
+		private int scoreOrRating = 0;
 
 		private TrailHead(final Point point) {
 			this.point = point;
