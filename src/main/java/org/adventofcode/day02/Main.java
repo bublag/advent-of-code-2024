@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+//--- Day 2: Red-Nosed Reports ---
 @UtilityClass
 public class Main {
 

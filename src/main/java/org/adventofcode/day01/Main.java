@@ -13,6 +13,7 @@ import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.io.FileUtils;
 
+//--- Day 1: Historian Hysteria ---
 @UtilityClass
 public class Main {
 

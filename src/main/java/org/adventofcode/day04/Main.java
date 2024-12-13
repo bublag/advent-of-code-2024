@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+//--- Day 4: Ceres Search ---
 @UtilityClass
 public class Main {
 

@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+//--- Day 8: Resonant Collinearity ---
 @UtilityClass
 public class Main {
 

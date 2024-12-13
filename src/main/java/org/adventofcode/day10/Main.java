@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+//--- Day 10: Hoof It ---
 @UtilityClass
 public class Main {
 

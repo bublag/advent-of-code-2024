@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+//--- Day 6: Guard Gallivant ---
 @UtilityClass
 public class Main {
 
