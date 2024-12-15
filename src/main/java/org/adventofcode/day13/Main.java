@@ -50,7 +50,7 @@ public class Main {
 			return clawMachine.prize().x() > higherX * 100 + lowerX * 100
 				|| clawMachine.prize().y() > higherY * 100 + lowerY * 100;
 		});
-		System.out.println("total number of claw machines after pre-filtering: " + clawMachines.size());
+		System.out.println("total number of claw machines after pre-filtering for part1: " + clawMachines.size());
 //		clawMachines.forEach(System.out::println);
 		System.out.println();
 
@@ -72,6 +72,43 @@ public class Main {
 		System.out.println("clawMachinesWinnables.size() = " + clawMachinesWinnables.size());
 		System.out.println("fewestTokensToWinEveryWinnableClawMachine = " + fewestTokensToWinEveryWinnableClawMachine);
 		System.out.println();
+
+		/*
+		part 2: we have to add "10000000000000" to the prize coordinates'. + there is no more 100 button press limit
+		Turns out my part1 solution cant be used for big numbers (it has to try too much numbers which cant be waited
+		out). For part2, I wrote down a claw machine in a "system of 2 linear equations with two unknown", solved it on
+		paper, generalized it, which gave me the formula for what is "a" and "b" (the button presses).
+		 */
+		final long start2 = System.currentTimeMillis();
+		final List<ClawMachinePart2> clawMachines2 = new ArrayList<>();
+		for (int i = 0; i < inputByLines.size(); i += 4) {
+			final String lineButtonA = inputByLines.get(i);
+			final String lineButtonB = inputByLines.get(i + 1);
+			final String linePrize = inputByLines.get(i + 2);
+			clawMachines2.add(new ClawMachinePart2(
+				convertButtonLine(lineButtonA),
+				convertButtonLine(lineButtonB),
+				convertPrizeLinePart2(linePrize)
+			));
+		}
+
+		// go over the claw machines and solve the "system of 2 linear equations with two unknown"
+		final List<ClawMachineWinnablePart2> clawMachinesPart2Winnables = new ArrayList<>();
+		for (final ClawMachinePart2 clawMachine : clawMachines2) {
+			final ClawMachineWinnablePart2 clawMachineWinnable = solveSystemOf2LinearEquationsWith2UnknownForClawMachine(clawMachine);
+			if (clawMachineWinnable != null) {
+				clawMachinesPart2Winnables.add(clawMachineWinnable);
+			}
+		}
+
+		// count the total tokens needed to win on every claw machine
+		final long fewestTokensToWinEveryWinnableClawMachinePart2 = clawMachinesPart2Winnables.stream()
+			.map(ClawMachineWinnablePart2::minimumTokensToWin)
+			.mapToLong(value -> value)
+			.sum();
+		System.out.println("part2 solution runtime in milliseconds = " + (System.currentTimeMillis() - start2));
+		System.out.println("clawMachinesPart2Winnables.size() = " + clawMachinesPart2Winnables.size());
+		System.out.println("fewestTokensToWinEveryWinnableClawMachinePart2 = " + fewestTokensToWinEveryWinnableClawMachinePart2);
 	}
 
 	/**
@@ -119,6 +156,34 @@ public class Main {
 		return clawMachineWinnable;
 	}
 
+	/**
+	 * Solved the "system of 2 linear equations with two unknown" on paper, and then I generalized it and got the
+	 * formula used in the method.
+	 */
+	private static ClawMachineWinnablePart2 solveSystemOf2LinearEquationsWith2UnknownForClawMachine(final ClawMachinePart2 clawMachine) {
+		final long Xa = clawMachine.buttonA().x();
+		final long Xb = clawMachine.buttonB().x();
+		final long Px = clawMachine.prize().x();
+		final long Ya = clawMachine.buttonA().y();
+		final long Yb = clawMachine.buttonB().y();
+		final long Py = clawMachine.prize().y();
+		if ((Px * Yb - Xb * Py) % (Xa * Yb - Xb * Ya) != 0
+			|| (Py * Xa * Yb - Ya * Px * Yb) % (Yb * Xa * Yb - Yb * Xb * Ya) != 0
+		) {
+			return null; // not winnable if the button presses are not integers
+		}
+		final long aButtonPresses = (Px * Yb - Xb * Py) / (Xa * Yb - Xb * Ya);
+		final long bButtonPresses = (Py * Xa * Yb - Ya * Px * Yb) / (Yb * Xa * Yb - Yb * Xb * Ya);
+		return new ClawMachineWinnablePart2(
+			new Button(clawMachine.buttonA().x(), clawMachine.buttonA().y()),
+			new Button(clawMachine.buttonB().x(), clawMachine.buttonB().y()),
+			new PrizePart2(clawMachine.prize().x(), clawMachine.prize().y()),
+			aButtonPresses * 3 + bButtonPresses,
+			aButtonPresses,
+			bButtonPresses
+		);
+	}
+
 	private static Button convertButtonLine(final String lineButton) {
 		final String[] split = lineButton.split(" ");
 		return new Button(
@@ -135,6 +200,15 @@ public class Main {
 		);
 	}
 
+	private static PrizePart2 convertPrizeLinePart2(final String linePrize) {
+		final String[] split = linePrize.split(" ");
+		final long unitConversionErrorForPart2 = 10000000000000L;
+		return new PrizePart2(
+			Long.parseLong(split[1].substring(2, split[1].length() - 1)) + unitConversionErrorForPart2,
+			Long.parseLong(split[2].substring(2)) + unitConversionErrorForPart2
+		);
+	}
+
 	private record Button(int x, int y) {}
 
 	private record Prize(int x, int y) {}
@@ -148,5 +222,18 @@ public class Main {
 		int minimumTokensToWin,
 		int aButtonPresses,
 		int bButtonPresses
+	) {}
+
+	private record PrizePart2(long x, long y) {}
+
+	private record ClawMachinePart2(Button buttonA, Button buttonB, PrizePart2 prize) {}
+
+	private record ClawMachineWinnablePart2(
+		Button buttonA,
+		Button buttonB,
+		PrizePart2 prize,
+		long minimumTokensToWin,
+		long aButtonPresses,
+		long bButtonPresses
 	) {}
 }
