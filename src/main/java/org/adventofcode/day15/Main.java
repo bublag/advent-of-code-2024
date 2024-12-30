@@ -26,6 +26,9 @@ public class Main {
 	private static final char CHAR_ROBOT_MOVEMENT_DOWN = 'v';
 	private static final char CHAR_ROBOT_MOVEMENT_LEFT = '<';
 
+	private static final char CHAR_BOX_PART2_LEFT = '[';
+	private static final char CHAR_BOX_PART2_RIGHT = ']';
+
 	public static void main(final String[] args) throws IOException {
 		// read the file
 		final List<String> inputByLines = FileUtils.readLines(
@@ -106,6 +109,55 @@ public class Main {
 		}
 		System.out.println("part1 solution runtime in milliseconds = " + (System.currentTimeMillis() - start));
 		System.out.println("sumOfBoxGpsCoordinates = " + sumOfBoxGpsCoordinates);
+
+		/*
+		part 2: Everything except the robot is twice as wide. Make the wider starting map for part2. Boxes can be
+		aligned that they push 2 other boxes (only possible with up and down directions).
+		 */
+		final long start2 = System.currentTimeMillis();
+		final Position robotPositionPart2 = new Position(0, 0);
+		final char[][] mapPart2 = new char[inputMapLines.size()][];
+		for (int y = 0; y < inputMapLines.size(); y++) {
+			final String line = inputMapLines.get(y);
+			mapPart2[y] = new char[line.length() * 2];
+			for (int x = 0; x < line.length(); x++) {
+				final char currentChar = line.charAt(x) == CHAR_BOX ? CHAR_BOX_PART2_LEFT : line.charAt(x);
+				final char currentCharWiderPair = switch (currentChar) {
+					case CHAR_WALL -> CHAR_WALL;
+					case CHAR_BOX_PART2_LEFT -> CHAR_BOX_PART2_RIGHT;
+					case CHAR_FREE, CHAR_ROBOT -> CHAR_FREE;
+					default -> throw new IllegalStateException("Unexpected value: " + currentChar);
+				};
+				mapPart2[y][x * 2] = currentChar;
+				mapPart2[y][x * 2 + 1] = currentCharWiderPair;
+				if (currentChar == CHAR_ROBOT) {
+					robotPositionPart2.setX(x * 2);
+					robotPositionPart2.setY(y);
+				}
+			}
+		}
+		System.out.println("part2 initial map:");
+		printMap(mapPart2);
+
+		for (final Direction move : moves) {
+//			System.out.println(move);
+			moveRobotOrPushBoxIfNotBlockedByWallPart2(mapPart2, robotPositionPart2, move);
+			// printing the map is slow so is only here for debug
+//			printMap(mapPart2);
+		}
+		System.out.println("part2 end result map:");
+		printMap(mapPart2);
+		// iterate over the map positions and sum up the boxes' custom GPS coordinates
+		long sumOfBoxGpsCoordinatesPart2 = 0;
+		for (int y = 0; y < mapPart2.length; y++) {
+			for (int x = 0; x < mapPart2[y].length; x++) {
+				if (mapPart2[y][x] == CHAR_BOX_PART2_LEFT) {
+					sumOfBoxGpsCoordinatesPart2 += y * 100L + x;
+				}
+			}
+		}
+		System.out.println("part2 solution runtime in milliseconds = " + (System.currentTimeMillis() - start2));
+		System.out.println("sumOfBoxGpsCoordinatesPart2 = " + sumOfBoxGpsCoordinatesPart2);
 	}
 
 	private static void printMap(final char[][] mapCharTable) {
@@ -173,6 +225,202 @@ public class Main {
 		// so that we always update the robot's position and can keep track of it
 		currentPosition.setX(nextPosition.getX());
 		currentPosition.setY(nextPosition.getY());
+	}
+
+	private static void moveRobotOrPushBoxIfNotBlockedByWallPart2(
+		final char[][] map,
+		final Position currentRobotPosition,
+		final Direction move
+	) {
+		final char nextPositionChar = getNextPositionChar(map, currentRobotPosition, move);
+		switch (nextPositionChar) {
+			case CHAR_WALL -> {/* can not move and can not push -> nothing to do */}
+			case CHAR_FREE -> moveCurrentPositionToNext(map, currentRobotPosition, move);
+			case CHAR_BOX_PART2_LEFT -> {
+				final Position nextPositionBoxLeftSide = getNextPosition(currentRobotPosition, move);
+				final boolean isBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+				if (isBoxPushed) {
+					moveCurrentPositionToNext(map, currentRobotPosition, move);
+				}
+			}
+			case CHAR_BOX_PART2_RIGHT -> {
+				final Position nextPositionBoxRightSide = getNextPosition(currentRobotPosition, move);
+				final Position nextPositionBoxLeftSide = new Position(nextPositionBoxRightSide.getX() - 1, nextPositionBoxRightSide.getY());
+				final boolean isNextPositionMoved = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+				if (isNextPositionMoved) {
+					moveCurrentPositionToNext(map, currentRobotPosition, move);
+				}
+			}
+			default -> throw new IllegalStateException("Unexpected value: " + nextPositionChar);
+		}
+	}
+
+	private static boolean pushBoxIfNotBlockedByWallPart2(
+		final char[][] map,
+		final Position currentBoxLeftPosition,
+		final Direction move
+	) {
+		final Position currentBoxRightPosition = new Position(currentBoxLeftPosition.getX() + 1, currentBoxLeftPosition.getY());
+		final char nextPositionLeftChar = getNextPositionChar(map, currentBoxLeftPosition, move);
+		final char nextPositionRightChar = getNextPositionChar(map, currentBoxRightPosition, move);
+		switch (move) {
+			case RIGHT -> {
+				switch (nextPositionRightChar) {
+					case CHAR_WALL -> {
+						return false;
+					}
+					case CHAR_FREE -> {
+						moveWideBox(map, currentBoxLeftPosition, move);
+						return true;
+					}
+					case CHAR_BOX_PART2_LEFT -> {
+						final Position nextPositionBoxLeftSide = getNextPosition(currentBoxRightPosition, move);
+						final boolean isNextBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+						if (isNextBoxPushed) {
+							moveWideBox(map, currentBoxLeftPosition, move);
+						}
+						return isNextBoxPushed;
+					}
+					default -> throw new IllegalStateException("Unexpected value: " + nextPositionRightChar);
+				}
+			}
+			case LEFT -> {
+				switch (nextPositionLeftChar) {
+					case CHAR_WALL -> {
+						return false;
+					}
+					case CHAR_FREE -> {
+						moveWideBox(map, currentBoxLeftPosition, move);
+						return true;
+					}
+					case CHAR_BOX_PART2_RIGHT -> {
+						final Position nextPositionBoxRightSide = getNextPosition(currentBoxLeftPosition, move);
+						final Position nextPositionBoxLeftSide = new Position(nextPositionBoxRightSide.getX() - 1, nextPositionBoxRightSide.getY());
+						final boolean isNextBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+						if (isNextBoxPushed) {
+							moveWideBox(map, currentBoxLeftPosition, move);
+						}
+						return isNextBoxPushed;
+					}
+					default -> throw new IllegalStateException("Unexpected value: " + nextPositionLeftChar);
+				}
+			}
+			case UP, DOWN -> {
+				if (nextPositionLeftChar == CHAR_WALL || nextPositionRightChar == CHAR_WALL) {
+					return false;
+				} else if (nextPositionLeftChar == CHAR_FREE && nextPositionRightChar == CHAR_FREE) {
+					moveWideBox(map, currentBoxLeftPosition, move);
+					return true;
+				} else if (nextPositionLeftChar == CHAR_BOX_PART2_LEFT) {
+					final Position nextPositionBoxLeftSide = getNextPosition(currentBoxLeftPosition, move);
+					final boolean isNextBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+					if (isNextBoxPushed) {
+						moveWideBox(map, currentBoxLeftPosition, move);
+					}
+					return isNextBoxPushed;
+				} else if (nextPositionLeftChar == CHAR_BOX_PART2_RIGHT && nextPositionRightChar == CHAR_FREE) {
+					final Position nextPositionBoxRightSide = getNextPosition(currentBoxLeftPosition, move);
+					final Position nextPositionBoxLeftSide = new Position(nextPositionBoxRightSide.getX() - 1, nextPositionBoxRightSide.getY());
+					final boolean isNextBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+					if (isNextBoxPushed) {
+						moveWideBox(map, currentBoxLeftPosition, move);
+					}
+					return isNextBoxPushed;
+				} else if (nextPositionLeftChar == CHAR_FREE && nextPositionRightChar == CHAR_BOX_PART2_LEFT) {
+					final Position nextPositionBoxLeftSide = getNextPosition(currentBoxRightPosition, move);
+					final boolean isNextBoxPushed = pushBoxIfNotBlockedByWallPart2(map, nextPositionBoxLeftSide, move);
+					if (isNextBoxPushed) {
+						moveWideBox(map, currentBoxLeftPosition, move);
+					}
+					return isNextBoxPushed;
+				} else if (nextPositionLeftChar == CHAR_BOX_PART2_RIGHT && nextPositionRightChar == CHAR_BOX_PART2_LEFT) {
+					final Position nextPositionLeftBoxRightSide = getNextPosition(currentBoxLeftPosition, move);
+					final Position nextPositionLeftBoxLeftSide = new Position(nextPositionLeftBoxRightSide.getX() - 1, nextPositionLeftBoxRightSide.getY());
+					final boolean canPushLeftBox = canPushBox(map, nextPositionLeftBoxLeftSide, move);
+					final Position nextPositionRightBoxLeftSide = getNextPosition(currentBoxRightPosition, move);
+					final boolean canPushRightBox = canPushBox(map, nextPositionRightBoxLeftSide, move);
+					if (canPushLeftBox && canPushRightBox) {
+						pushBoxIfNotBlockedByWallPart2(map, nextPositionLeftBoxLeftSide, move);
+						pushBoxIfNotBlockedByWallPart2(map, nextPositionRightBoxLeftSide, move);
+						moveWideBox(map, currentBoxLeftPosition, move);
+						return true;
+					}
+					return false;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static void moveWideBox(
+		final char[][] map,
+		final Position boxLeftPosition,
+		final Direction move
+	) {
+		final Position boxRightPosition = new Position(boxLeftPosition.getX() + 1, boxLeftPosition.getY());
+		switch (move) {
+			case UP -> {
+				map[boxLeftPosition.getY() - 1][boxLeftPosition.getX()] = CHAR_BOX_PART2_LEFT;
+				map[boxLeftPosition.getY() - 1][boxLeftPosition.getX() + 1] = CHAR_BOX_PART2_RIGHT;
+				map[boxLeftPosition.getY()][boxLeftPosition.getX()] = CHAR_FREE;
+				map[boxRightPosition.getY()][boxRightPosition.getX()] = CHAR_FREE;
+			}
+			case RIGHT -> {
+				map[boxRightPosition.getY()][boxRightPosition.getX() + 1] = CHAR_BOX_PART2_RIGHT;
+				map[boxLeftPosition.getY()][boxLeftPosition.getX() + 1] = CHAR_BOX_PART2_LEFT;
+				map[boxLeftPosition.getY()][boxLeftPosition.getX()] = CHAR_FREE;
+			}
+			case DOWN -> {
+				map[boxLeftPosition.getY() + 1][boxLeftPosition.getX()] = CHAR_BOX_PART2_LEFT;
+				map[boxLeftPosition.getY() + 1][boxLeftPosition.getX() + 1] = CHAR_BOX_PART2_RIGHT;
+				map[boxLeftPosition.getY()][boxLeftPosition.getX()] = CHAR_FREE;
+				map[boxRightPosition.getY()][boxRightPosition.getX()] = CHAR_FREE;
+			}
+			case LEFT -> {
+				map[boxLeftPosition.getY()][boxLeftPosition.getX() - 1] = CHAR_BOX_PART2_LEFT;
+				map[boxRightPosition.getY()][boxRightPosition.getX() - 1] = CHAR_BOX_PART2_RIGHT;
+				map[boxRightPosition.getY()][boxRightPosition.getX()] = CHAR_FREE;
+			}
+			default -> throw new IllegalStateException("Unexpected value: " + move);
+		}
+	}
+
+	private static boolean canPushBox(
+		final char[][] map,
+		final Position currentBoxLeftPosition,
+		final Direction move
+	) {
+		final Position currentBoxRightPosition = new Position(currentBoxLeftPosition.getX() + 1, currentBoxLeftPosition.getY());
+		final char nextPositionLeftChar = getNextPositionChar(map, currentBoxLeftPosition, move);
+		final char nextPositionRightChar = getNextPositionChar(map, currentBoxRightPosition, move);
+		if (move == Direction.UP || move == Direction.DOWN) {
+			if (nextPositionLeftChar == CHAR_WALL || nextPositionRightChar == CHAR_WALL) {
+				return false;
+			} else if (nextPositionLeftChar == CHAR_FREE && nextPositionRightChar == CHAR_FREE) {
+				return true;
+			} else if (nextPositionLeftChar == CHAR_BOX_PART2_LEFT) {
+				final Position nextPositionBoxLeftSide = getNextPosition(currentBoxLeftPosition, move);
+				return canPushBox(map, nextPositionBoxLeftSide, move);
+			} else if (nextPositionLeftChar == CHAR_BOX_PART2_RIGHT && nextPositionRightChar == CHAR_FREE) {
+				final Position nextPositionBoxRightSide = getNextPosition(currentBoxLeftPosition, move);
+				final Position nextPositionBoxLeftSide = new Position(nextPositionBoxRightSide.getX() - 1, nextPositionBoxRightSide.getY());
+				return canPushBox(map, nextPositionBoxLeftSide, move);
+			} else if (nextPositionLeftChar == CHAR_FREE && nextPositionRightChar == CHAR_BOX_PART2_LEFT) {
+				final Position nextPositionBoxLeftSide = getNextPosition(currentBoxRightPosition, move);
+				return canPushBox(map, nextPositionBoxLeftSide, move);
+			} else if (nextPositionLeftChar == CHAR_BOX_PART2_RIGHT && nextPositionRightChar == CHAR_BOX_PART2_LEFT) {
+				final Position nextPositionLeftBoxRightSide = getNextPosition(currentBoxLeftPosition, move);
+				final Position nextPositionLeftBoxLeftSide = new Position(nextPositionLeftBoxRightSide.getX() - 1, nextPositionLeftBoxRightSide.getY());
+				final boolean canPushLeftBox = canPushBox(map, nextPositionLeftBoxLeftSide, move);
+				final Position nextPositionRightBoxLeftSide = getNextPosition(currentBoxRightPosition, move);
+				final boolean canPushRightBox = canPushBox(map, nextPositionRightBoxLeftSide, move);
+				return canPushLeftBox && canPushRightBox;
+			} else {
+			    throw new IllegalStateException("Unexpected next positions: '" + nextPositionLeftChar + "', '" + nextPositionRightChar + "'");
+			}
+		} else {
+			throw new IllegalStateException("Unexpected value: " + move);
+		}
 	}
 
 	@Getter
