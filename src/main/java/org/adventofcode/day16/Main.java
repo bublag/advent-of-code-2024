@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 //--- Day 16: Reindeer Maze ---
 @UtilityClass
@@ -21,6 +22,7 @@ public class Main {
 	private static final char CHAR_WALL = '#';
 
 	private static final char CHAR_PATH_VISITED = 'X';
+	private static final char CHAR_POINT_ON_AT_LEAST_ONE_BEST_PATH = 'O';
 
 	public static void main(final String[] args) throws IOException {
 		// read the file
@@ -33,6 +35,7 @@ public class Main {
 		// convert it into a char 2 dimension array (the map of the maze)
 		final char[][] map = new char[inputByLines.size()][];
 		Point startPoint = null;
+		Point endPoint = null;
 		for (int y = 0; y < inputByLines.size(); y++) {
 			final String line = inputByLines.get(y);
 			map[y] = new char[line.length()];
@@ -41,6 +44,8 @@ public class Main {
 				map[y][x] = currentChar;
 				if (currentChar == CHAR_START) {
 					startPoint = new Point(x, y);
+				} else if (currentChar == CHAR_END) {
+					endPoint = new Point(x, y);
 				}
 			}
 		}
@@ -49,20 +54,36 @@ public class Main {
 		printMap(map);
 
 		// get some possible paths which starts from the startPoint and ends at the endPoint
-		final List<Path> paths = findPathDepthFirstSearch(map, startPoint, Direction.EAST, new ArrayList<>(), 0L, new LinkedHashMap<>(), new ArrayList<>());
+		final List<Path> paths = findPathsDepthFirstSearch(map, startPoint, Direction.EAST, new ArrayList<>(), 0L, new LinkedHashMap<>(), new ArrayList<>());
 		// get the Path with the lowest score
 		final Path lowestScorePath = paths.stream()
 			.min(Comparator.comparing(Path::score))
 			.orElseThrow(RuntimeException::new);
 		final long lowestScorePathScore = lowestScorePath.score();
 		System.out.println("path with the lowest score visualized on the map:");
-		printPathOnMap(cloneMap(map), startPoint, lowestScorePath);
+		printPathOnMap(cloneMap(map), startPoint, endPoint, lowestScorePath);
 		System.out.println("part1 solution runtime in milliseconds = " + (System.currentTimeMillis() - start));
 		System.out.println("found a total of " + paths.size() + " paths");
 		System.out.println("lowestScorePathScore = " + lowestScorePathScore);
-//		for (final Path path : paths) {
+		System.out.println();
+
+		// part 2: Use every "best" path (paths with the lowest score) and sum up how many unique points they have.
+		final long start2 = System.currentTimeMillis();
+		final List<Path> bestPaths = paths.stream()
+			.filter(path -> path.score() == lowestScorePathScore)
+			.toList();
+		System.out.println("part2: total number of best paths: " + bestPaths.size());
+//		for (final Path path : bestPaths) {
 //			printPathOnMap(cloneMap(map), startPoint, path);
 //		}
+		printPathsOnMap(cloneMap(map), bestPaths);
+		final int numberOfPointsThatArePartOfAtLeastOneBestPath = bestPaths.stream()
+			.map(Path::points)
+			.flatMap(List::stream)
+			.collect(Collectors.toSet())
+			.size();
+		System.out.println("part2 solution runtime in milliseconds = " + (System.currentTimeMillis() - start2));
+		System.out.println("numberOfPointsThatArePartOfAtLeastOneBestPath = " + numberOfPointsThatArePartOfAtLeastOneBestPath);
 	}
 
 	private static void printMap(final char[][] mapCharTable) {
@@ -75,7 +96,8 @@ public class Main {
 		System.out.println();
 	}
 
-	private static List<Path> findPathDepthFirstSearch(
+	// TODO kinda slow runtime, could be optimized
+	private static List<Path> findPathsDepthFirstSearch(
 		final char[][] map,
 		final Point pointFrom,
 		final Direction directionFacing,
@@ -84,22 +106,31 @@ public class Main {
 		final LinkedHashMap<Point, Long> visitedPointWithLowestScoreCache,
 		final List<Path> foundPaths
 	) {
+		currentPointsOnPath.add(pointFrom);
 		final char pointFromChar = map[pointFrom.y()][pointFrom.x()];
 		if (pointFromChar == CHAR_END) { // found a path to the end -> save it
 			foundPaths.add(new Path(currentPointsOnPath, currentScore));
 			return foundPaths;
 		}
+		/*
+		The score is 1000 less if we arrive at this point and will go straight compared to if we arrive here and
+		continuing with a turn. At this point we do not know if one will be worse than the other, they can have both
+		the same score in the end, so we have to allow a 1000 score difference here comparing the cache.
+		 */
 		if (visitedPointWithLowestScoreCache.containsKey(pointFrom)) { // already visited this point previously from anywhere
 			final Long savedScoreForThisPoint = visitedPointWithLowestScoreCache.get(pointFrom);
-			if (currentScore < savedScoreForThisPoint) { // found a lower score for this point -> update the cache and continue the search
-				visitedPointWithLowestScoreCache.put(pointFrom, currentScore);
-			} else { // the current score is higher than the cached score for this point -> do not continue the search
+			if (currentScore > savedScoreForThisPoint + 1000L) { // the current score is higher than the cached score for this point -> do not continue the search
 				return foundPaths;
+			} else if (currentScore < savedScoreForThisPoint) { // found a lower score for this point -> update the cache and continue the search
+				visitedPointWithLowestScoreCache.put(pointFrom, currentScore);
 			}
+			/*
+			equals or the difference is less than 1000 -> the current path has the same score for this point as another
+			path which previously visited this point -> continue the search because we want to find all the "best" paths
+			 */
 		} else { // not yet visited point -> cache it and continue the search
 			visitedPointWithLowestScoreCache.put(pointFrom, currentScore);
 		}
-		currentPointsOnPath.add(pointFrom);
 		/*
 		We can use the list of visited points for 1 direction. But if we go to multiple directions from here, we need to
 		clone the list and pass the new cloned list to the other directions (the different paths can not use the same
@@ -115,7 +146,7 @@ public class Main {
 			if (directionFacing != Direction.NORTH) { // turning 90 degrees
 				newCurrentScore += 1000;
 			}
-			findPathDepthFirstSearch(
+			findPathsDepthFirstSearch(
 				map,
 				pointToOneNorth,
 				Direction.NORTH,
@@ -133,7 +164,7 @@ public class Main {
 			if (directionFacing != Direction.EAST) { // turning 90 degrees
 				newCurrentScore += 1000;
 			}
-			findPathDepthFirstSearch(
+			findPathsDepthFirstSearch(
 				map,
 				pointToOneEast,
 				Direction.EAST,
@@ -151,7 +182,7 @@ public class Main {
 			if (directionFacing != Direction.SOUTH) { // turning 90 degrees
 				newCurrentScore += 1000;
 			}
-			findPathDepthFirstSearch(
+			findPathsDepthFirstSearch(
 				map,
 				pointToOneSouth,
 				Direction.SOUTH,
@@ -169,7 +200,7 @@ public class Main {
 			if (directionFacing != Direction.WEST) { // turning 90 degrees
 				newCurrentScore += 1000;
 			}
-			findPathDepthFirstSearch(
+			findPathsDepthFirstSearch(
 				map,
 				pointToOneWest,
 				Direction.WEST,
@@ -182,12 +213,29 @@ public class Main {
 		return foundPaths;
 	}
 
-	private static void printPathOnMap(final char[][] map, final Point startPoint, final Path path) {
+	private static void printPathOnMap(final char[][] map, final Point startPoint, final Point endPoint, final Path path) {
 		for (final Point pathPoint : path.points()) {
 			map[pathPoint.y()][pathPoint.x()] = CHAR_PATH_VISITED;
 		}
 		map[startPoint.y()][startPoint.x()] = CHAR_START;
+		map[endPoint.y()][endPoint.x()] = CHAR_END;
 		System.out.println("path with score: " + path.score());
+		for (final char[] row : map) {
+			for (final char c : row) {
+				System.out.print(c);
+			}
+			System.out.println();
+		}
+		System.out.println();
+	}
+
+	private static void printPathsOnMap(final char[][] map, final List<Path> paths) {
+		for (final Path path : paths) {
+			for (final Point pathPoint : path.points()) {
+				map[pathPoint.y()][pathPoint.x()] = CHAR_POINT_ON_AT_LEAST_ONE_BEST_PATH;
+			}
+		}
+		System.out.println("part2: visualizing every point which is part of any \"best\" path:");
 		for (final char[] row : map) {
 			for (final char c : row) {
 				System.out.print(c);
